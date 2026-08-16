@@ -85,3 +85,12 @@ React → Vercel API (/api/*) → YahooFinanceProvider → Yahoo Finance
 
 This application provides analytical insights and does not constitute
 financial advice. Signals and scores are not guarantees of future performance.
+
+## License
+
+RC SmartPredict is available for personal, educational, research, and
+non-commercial use only.
+
+Commercial use requires prior written permission from the author.
+
+See [LICENSE](LICENSE) for details.
