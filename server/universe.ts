@@ -4,16 +4,16 @@
  * from real data. Results are cached in-memory per serverless instance with
  * stale-while-revalidate.
  */
-import type { CorporateAction, MarketOverview, ScoredStock, StockDetail } from "../src/types";
-import { IHSG_SYMBOL, WATCHLIST } from "./watchlist";
-import { getDailyHistory, getFundamentals, getHistory, getQuote, getQuotes } from "./yahoo";
-import type { YahooChart } from "./yahoo";
+import type { CorporateAction, MarketOverview, ScoredStock, StockDetail } from "../src/types/index.js";
+import { IHSG_SYMBOL, WATCHLIST } from "./watchlist.js";
+import { getDailyHistory, getFundamentals, getHistory, getQuote, getQuotes } from "./yahoo.js";
+import type { YahooChart } from "./yahoo.js";
 import {
   buildStockDetail,
   corporateActionsFromEvents,
   pctReturn,
   scoreStock,
-} from "./analytics";
+} from "./analytics.js";
 
 // ── tiny in-memory TTL cache (per warm instance) ───────────────────────
 

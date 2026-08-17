@@ -1,1 +1,1 @@
-{"root":["./vite.config.ts","./server/analytics.ts","./server/devapi.ts","./server/handlers.ts","./server/universe.ts","./server/watchlist.ts","./server/yahoo.ts","./api/events.ts","./api/overview.ts","./api/universe.ts","./api/history/[ticker].ts","./api/stocks/[ticker].ts"],"version":"5.9.3"}
+{"root":["./server/analytics.ts","./server/devapi.ts","./server/handlers.ts","./server/universe.ts","./server/watchlist.ts","./server/yahoo.ts","./api/events.ts","./api/overview.ts","./api/universe.ts","./api/history/[ticker].ts","./api/stocks/[ticker].ts"],"version":"5.9.3"}

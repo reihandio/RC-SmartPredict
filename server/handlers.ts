@@ -8,7 +8,7 @@ import {
   getPriceHistory,
   getScoredUniverse,
   getStockDetail,
-} from "./universe";
+} from "./universe.js";
 
 export interface HandlerResult {
   status: number;

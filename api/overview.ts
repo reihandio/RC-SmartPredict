@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { handleOverview } from "../server/handlers";
+import { handleOverview } from "../server/handlers.js";
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
   const { status, body } = await handleOverview();

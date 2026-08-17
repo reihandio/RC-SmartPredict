@@ -13,8 +13,8 @@ import type {
   ScoredStock,
   Signal,
   StockDetail,
-} from "../src/types";
-import type { YahooBar, YahooChart, YahooEvent, YahooQuote } from "./yahoo";
+} from "../src/types/index.js";
+import type { YahooBar, YahooChart, YahooEvent, YahooQuote } from "./yahoo.js";
 
 export const clamp = (v: number, min = 0, max = 100): number => Math.min(max, Math.max(min, v));
 export const round1 = (v: number): number => Math.round(v * 10) / 10;

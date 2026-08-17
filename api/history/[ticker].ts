@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { handleHistory } from "../../server/handlers";
+import { handleHistory } from "../../server/handlers.js";
 
 const VALID_RANGES = ["1D", "1W", "1M", "3M", "6M", "1Y"];
 
