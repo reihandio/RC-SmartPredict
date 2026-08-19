@@ -48,7 +48,14 @@ async function cachedFetch<T>(key: string, ttlMs: number, fn: () => Promise<T>):
 
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(path);
-  const body = (await res.json().catch(() => ({}))) as { error?: string } & T;
+  let body: { error?: string } & T;
+  try {
+    body = (await res.json()) as { error?: string } & T;
+  } catch {
+    // A non-JSON body (e.g. the SPA shell served by a misconfigured rewrite)
+    // must surface as an error state — never as silently empty data.
+    throw new Error(`Unexpected response from ${path}. Please try again later.`);
+  }
   if (!res.ok || body.error) {
     throw new Error(body.error ?? "Unable to retrieve market data.");
   }
