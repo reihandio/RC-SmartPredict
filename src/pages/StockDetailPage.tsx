@@ -40,7 +40,7 @@ export default function StockDetailPage() {
 
   const report = useMemo(() => {
     if (!data) return undefined;
-    const action = data.actions[0];
+    const action = data.actions?.[0];
     const catalystNote = action
       ? `${action.type}: ${action.description} (${action.date})`
       : undefined;
