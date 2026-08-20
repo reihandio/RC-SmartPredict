@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Flame, Newspaper, PiggyBank, Rocket, RotateCcw, Star } from "lucide-react";
+import { Flame, Landmark, Newspaper, PiggyBank, Rocket, RotateCcw, ShieldCheck, Star } from "lucide-react";
 import type { Signal } from "../../types";
 import { cn } from "../../lib/utils";
 
@@ -16,6 +16,10 @@ export interface ScreenerFilters {
   maxRisk: number; // 100 = any
   minScore: number; // 0 = any
   signal: Signal | "ANY";
+  // Section 13a/13b filters (new): only stocks with computed broker/VA data
+  // pass while active — tickers still collecting data are excluded honestly.
+  brokerTier: "ANY" | "A" | "B" | "C";
+  genuineVolumeOnly: boolean;
 }
 
 export const DEFAULT_FILTERS: ScreenerFilters = {
@@ -29,12 +33,16 @@ export const DEFAULT_FILTERS: ScreenerFilters = {
   maxRisk: 100,
   minScore: 0,
   signal: "ANY",
+  brokerTier: "ANY",
+  genuineVolumeOnly: false,
 };
 
 export interface Preset {
   id: string;
   label: string;
   icon: typeof Flame;
+  /** Emoji-only marker (spec labels); renders instead of the icon when set. */
+  emoji?: string;
   /** Constraints applied on top of the defaults. */
   patch: Partial<ScreenerFilters>;
 }
@@ -50,6 +58,10 @@ export const PRESETS: Preset[] = [
   { id: "accumulation", label: "Accumulation", icon: PiggyBank, patch: { minAccumulation: 70 } },
   { id: "catalyst", label: "Corporate Catalyst", icon: Newspaper, patch: { minCatalyst: 65 } },
   { id: "high-score", label: "High Score", icon: Star, patch: { minScore: 70 } },
+  // NEW presets (13a/13b) — appended, existing presets untouched.
+  // emoji + label render together as "🏦 Broker Tier A" / "✅ Genuine Volume Only".
+  { id: "broker-tier-a", label: "Broker Tier A", icon: Landmark, emoji: "🏦", patch: { brokerTier: "A" } },
+  { id: "genuine-volume", label: "Genuine Volume Only", icon: ShieldCheck, emoji: "✅", patch: { genuineVolumeOnly: true } },
 ];
 
 const SIGNAL_OPTIONS: Array<Signal | "ANY"> = [
@@ -154,7 +166,11 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
               )}
               aria-pressed={activePreset === preset.id}
             >
-              <Icon className="h-3.5 w-3.5" aria-hidden />
+              {preset.emoji ? (
+                <span aria-hidden>{preset.emoji}</span>
+              ) : (
+                <Icon className="h-3.5 w-3.5" aria-hidden />
+              )}
               {preset.label}
             </button>
           );
@@ -258,6 +274,34 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
             <option value={70}>≥ 70</option>
             <option value={80}>≥ 80</option>
           </select>
+        </Field>
+
+        {/* NEW (13a): broker accumulation tier — only stocks with computed
+            Bandarmology data pass while a tier is selected */}
+        <Field label="Broker Tier">
+          <select
+            value={filters.brokerTier}
+            onChange={(e) => set({ brokerTier: e.target.value as ScreenerFilters["brokerTier"] })}
+            className={controlCls}
+          >
+            <option value="ANY">Any</option>
+            <option value="A">Tier A only</option>
+            <option value="B">Tier B only</option>
+            <option value="C">Tier C only</option>
+          </select>
+        </Field>
+
+        {/* NEW (13b): genuine-volume-only gate, authenticity ≥ 60 */}
+        <Field label="Volume Authenticity">
+          <label className="flex h-[34px] cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-surface2 px-2.5 text-sm text-ink2 transition hover:border-white/20">
+            <input
+              type="checkbox"
+              checked={filters.genuineVolumeOnly}
+              onChange={(e) => set({ genuineVolumeOnly: e.target.checked })}
+              className="h-3.5 w-3.5 rounded accent-accent"
+            />
+            Genuine only (≥ 60)
+          </label>
         </Field>
       </div>
 

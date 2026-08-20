@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
+  BarChart3,
   CalendarDays,
+  Crosshair,
   LayoutDashboard,
   Menu,
   Radar,
@@ -19,6 +21,8 @@ const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/screener", label: "Stock Screener", icon: SlidersHorizontal, end: false },
   { to: "/money-flow", label: "Money Flow Radar", icon: Radar, end: false },
+  { to: "/broker-radar", label: "Broker Radar", icon: BarChart3, end: false },
+  { to: "/swing-candidates", label: "Swing Candidates", icon: Crosshair, end: false },
   { to: "/corporate-actions", label: "Corporate Actions", icon: CalendarDays, end: false },
 ];
 
@@ -26,6 +30,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/screener": "Stock Screener",
   "/money-flow": "Money Flow Radar",
+  "/broker-radar": "Broker Accumulation Radar",
+  "/swing-candidates": "Swing Trade Candidates",
   "/corporate-actions": "Corporate Action Radar",
 };
 

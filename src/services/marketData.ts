@@ -8,13 +8,23 @@
  * navigating between pages.
  */
 import type {
+  BrokerAccumulationSummary,
   CorporateAction,
   MarketOverview,
   PriceData,
   ScoredStock,
   StockDetail,
+  SwingCandidate,
   TimeRange,
 } from "../types";
+import { MockMarketDataProvider } from "./mockProvider";
+
+/** Radar entry: cached Bandarmology summary + freshness status. */
+export interface BrokerRadarEntry {
+  ticker: string;
+  summary: BrokerAccumulationSummary | null;
+  status: "FRESH" | "STALE" | "PENDING";
+}
 
 export interface MarketDataProvider {
   getMarketOverview(): Promise<MarketOverview>;
@@ -26,6 +36,11 @@ export interface MarketDataProvider {
   }>;
   getHistoricalPrices(ticker: string, range: TimeRange): Promise<PriceData[]>;
   getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string }>;
+  /** Bandarmology (Section 13a). Null = data unavailable (never a fake zero). */
+  getBrokerSummary(ticker: string): Promise<BrokerAccumulationSummary | null>;
+  getBrokerRadar(): Promise<{ entries: BrokerRadarEntry[]; updatedAt: string }>;
+  /** Swing trade candidates (Section 13c). */
+  getSwingCandidates(): Promise<{ candidates: SwingCandidate[]; updatedAt: string }>;
 }
 
 // ── tiny TTL cache (per session) ────────────────────────────────────────
@@ -66,6 +81,9 @@ const QUOTE_TTL = 60 * 1000; // quotes/overview: 1 min
 const UNIVERSE_TTL = 60 * 1000;
 const HISTORY_TTL = 10 * 60 * 1000; // charts rarely change
 const EVENTS_TTL = 30 * 60 * 1000;
+const BROKER_TTL = 30 * 60 * 1000; // server caches 6 h; client refreshes politely
+const BROKER_RADAR_TTL = 5 * 60 * 1000;
+const SWING_TTL = 10 * 60 * 1000; // swing list: 10 min
 
 /** Real-data provider backed by the app's Vercel API. */
 export class ApiMarketDataProvider implements MarketDataProvider {
@@ -113,7 +131,47 @@ export class ApiMarketDataProvider implements MarketDataProvider {
       apiGet<{ actions: CorporateAction[]; updatedAt: string }>("/api/events"),
     );
   }
+
+  async getBrokerSummary(ticker: string): Promise<BrokerAccumulationSummary | null> {
+    const t = ticker.toUpperCase();
+    return cachedFetch(`broker:${t}`, BROKER_TTL, async () => {
+      try {
+        const body = await apiGet<{ summary: BrokerAccumulationSummary }>(
+          `/api/broker-summary/${encodeURIComponent(t)}`,
+        );
+        return body.summary;
+      } catch {
+        // 404/502 → "Broker data unavailable" state (Section 28), not a fake zero
+        return null;
+      }
+    });
+  }
+
+  async getBrokerRadar(): Promise<{ entries: BrokerRadarEntry[]; updatedAt: string }> {
+    return cachedFetch("broker-radar", BROKER_RADAR_TTL, () =>
+      apiGet<{ entries: BrokerRadarEntry[]; updatedAt: string }>("/api/broker-radar"),
+    );
+  }
+
+  async getSwingCandidates(): Promise<{ candidates: SwingCandidate[]; updatedAt: string }> {
+    return cachedFetch("swing-candidates", SWING_TTL, () =>
+      apiGet<{ candidates: SwingCandidate[]; updatedAt: string }>("/api/swing-candidates"),
+    );
+  }
 }
 
-/** Singleton provider used by the app. */
-export const marketDataProvider: MarketDataProvider = new ApiMarketDataProvider();
+/** Singleton provider used by the app.
+ *
+ * Production default is ALWAYS the live API provider. The mock provider is
+ * only selected when `VITE_USE_MOCK_DATA=true` is set in local dev — and the
+ * UI shows a persistent warning banner while it is active.
+ */
+export const useMockData =
+  (import.meta.env.VITE_USE_MOCK_DATA ?? "false") === "true";
+
+function resolveProvider(): MarketDataProvider {
+  if (!useMockData) return new ApiMarketDataProvider();
+  return new MockMarketDataProvider();
+}
+
+export const marketDataProvider: MarketDataProvider = resolveProvider();
