@@ -17,6 +17,7 @@ import type {
   PriceData,
   ScoredStock,
   StockDetail,
+  SwingCandidate,
   TimeRange,
 } from "../types";
 import type { BrokerRadarEntry, MarketDataProvider } from "./marketData";
@@ -492,5 +493,35 @@ export class MockMarketDataProvider implements MarketDataProvider {
       return { ticker: f.ticker, summary: null, status: "PENDING" as const };
     });
     return { entries, updatedAt: UPDATED_AT };
+  }
+
+  async getSwingCandidates(): Promise<{ candidates: SwingCandidate[]; updatedAt: string }> {
+    const mk = (ticker: string, score: number, setup: SwingCandidate["technicalSetup"], conf: SwingCandidate["confidence"]): SwingCandidate => ({
+      ticker,
+      companyName: FIXTURES.find((f) => f.ticker === ticker)?.companyName ?? ticker,
+      overallScore: score,
+      confidence: conf,
+      brokerTier: "A",
+      brokerReason: "FIXTURE — consistent net buying across 7/14/30D",
+      volumeAuthenticityScore: 79,
+      volumeClassification: "GENUINE",
+      technicalSetup: setup,
+      entry: 10200,
+      stopLoss: 9850,
+      takeProfit1: 10900,
+      takeProfit2: 11300,
+      fundamentalNote: "FIXTURE — EPS trend improving; PBV 2.4; ROE 21.8%. No red flags from available data.",
+      holdingHorizonDays: [10, 20],
+      category: "SWING",
+      riskNotes: [],
+      updatedAt: UPDATED_AT,
+    });
+    return {
+      candidates: [
+        mk("BBCA", 84, "BREAKOUT", "HIGH"),
+        mk("ADRO", 72, "PULLBACK", "MEDIUM"),
+      ],
+      updatedAt: UPDATED_AT,
+    };
   }
 }

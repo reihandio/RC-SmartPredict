@@ -53,6 +53,10 @@ const ROUTES: Array<{
     match: /^\/api\/cron\/broker-radar$/,
     call: (h) => h.handleCronBrokerRadar(),
   },
+  {
+    match: /^\/api\/swing-candidates$/,
+    call: (h) => h.handleSwingCandidates(),
+  },
 ];
 
 export function devApi(): Plugin {

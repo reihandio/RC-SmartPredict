@@ -1,11 +1,12 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { handleBrokerRadar } from "../server/handlers.js";
+import { handleSwingCandidates } from "../server/handlers.js";
 
-// Cold paths can run 10-30 s (bounded on-demand broker scrapes) — allow up to the plan max.
+// The swing pipeline scans the tracked universe (quotes + history + bounded
+// broker fill) on demand — allow up to the plan maximum.
 export const maxDuration = 60;
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
-  const { status, body } = await handleBrokerRadar();
+  const { status, body } = await handleSwingCandidates();
   res.setHeader("Cache-Control", "no-store");
   res.status(status).json(body);
 }

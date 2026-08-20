@@ -21,6 +21,10 @@ function applyFilters(stocks: ScoredStock[], f: ScreenerFilters): ScoredStock[] 
     if (s.anomalyRisk > f.maxRisk) return false;
     if (s.overallScore < f.minScore) return false;
     if (f.signal !== "ANY" && s.signal !== f.signal) return false;
+    // NEW (13a/13b): stocks without computed broker/VA data are excluded
+    // while these filters are active — coverage fills via the precompute.
+    if (f.brokerTier !== "ANY" && s.brokerTier !== f.brokerTier) return false;
+    if (f.genuineVolumeOnly && (s.volumeAuthenticityScore ?? 0) < 60) return false;
     return true;
   });
 }

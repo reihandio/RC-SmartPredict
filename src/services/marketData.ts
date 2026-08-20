@@ -14,6 +14,7 @@ import type {
   PriceData,
   ScoredStock,
   StockDetail,
+  SwingCandidate,
   TimeRange,
 } from "../types";
 import { MockMarketDataProvider } from "./mockProvider";
@@ -38,6 +39,8 @@ export interface MarketDataProvider {
   /** Bandarmology (Section 13a). Null = data unavailable (never a fake zero). */
   getBrokerSummary(ticker: string): Promise<BrokerAccumulationSummary | null>;
   getBrokerRadar(): Promise<{ entries: BrokerRadarEntry[]; updatedAt: string }>;
+  /** Swing trade candidates (Section 13c). */
+  getSwingCandidates(): Promise<{ candidates: SwingCandidate[]; updatedAt: string }>;
 }
 
 // ── tiny TTL cache (per session) ────────────────────────────────────────
@@ -80,6 +83,7 @@ const HISTORY_TTL = 10 * 60 * 1000; // charts rarely change
 const EVENTS_TTL = 30 * 60 * 1000;
 const BROKER_TTL = 30 * 60 * 1000; // server caches 6 h; client refreshes politely
 const BROKER_RADAR_TTL = 5 * 60 * 1000;
+const SWING_TTL = 10 * 60 * 1000; // swing list: 10 min
 
 /** Real-data provider backed by the app's Vercel API. */
 export class ApiMarketDataProvider implements MarketDataProvider {
@@ -146,6 +150,12 @@ export class ApiMarketDataProvider implements MarketDataProvider {
   async getBrokerRadar(): Promise<{ entries: BrokerRadarEntry[]; updatedAt: string }> {
     return cachedFetch("broker-radar", BROKER_RADAR_TTL, () =>
       apiGet<{ entries: BrokerRadarEntry[]; updatedAt: string }>("/api/broker-radar"),
+    );
+  }
+
+  async getSwingCandidates(): Promise<{ candidates: SwingCandidate[]; updatedAt: string }> {
+    return cachedFetch("swing-candidates", SWING_TTL, () =>
+      apiGet<{ candidates: SwingCandidate[]; updatedAt: string }>("/api/swing-candidates"),
     );
   }
 }

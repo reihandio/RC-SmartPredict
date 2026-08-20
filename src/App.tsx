@@ -11,6 +11,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 // The chart library is heavy — load the stock page on demand.
 const StockDetailPage = lazy(() => import("./pages/StockDetailPage"));
 const BrokerRadarPage = lazy(() => import("./pages/BrokerRadarPage"));
+const SwingCandidatesPage = lazy(() => import("./pages/SwingCandidatesPage"));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -42,6 +43,14 @@ export default function App() {
             element={
               <Suspense fallback={<LoadingState label="Loading broker radar…" />}>
                 <BrokerRadarPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="swing-candidates"
+            element={
+              <Suspense fallback={<LoadingState label="Scanning swing candidates…" />}>
+                <SwingCandidatesPage />
               </Suspense>
             }
           />

@@ -203,6 +203,10 @@ export async function getBrokerRadar(maxFill = 6): Promise<{
 }
 
 /** Fill (or refresh) a batch of tickers with bounded concurrency. */
+export async function fillBrokerTickers(tickers: string[], concurrency: number): Promise<void> {
+  return fillTickers(tickers, concurrency);
+}
+
 async function fillTickers(tickers: string[], concurrency: number): Promise<void> {
   const endDate = latestTradingDay();
   const store = brokerCache();

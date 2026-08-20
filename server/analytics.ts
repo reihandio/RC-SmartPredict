@@ -493,6 +493,13 @@ export function scoreStock(
     atr: a !== null ? round1(a) : 0,
     priceVs52w,
     volumeAuthenticityScore: va.score,
+    // only set when the cached Bandarmology summary exists (never fabricated)
+    ...(broker
+      ? {
+          brokerAccumulationScore: broker.score,
+          brokerTier: broker.tier as "A" | "B" | "C",
+        }
+      : {}),
   };
 }
 

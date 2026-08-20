@@ -14,6 +14,7 @@ import {
   getBrokerSummary,
   refreshRadarSlice,
 } from "./broker/service.js";
+import { getSwingCandidates } from "./swingService.js";
 
 export interface HandlerResult {
   status: number;
@@ -120,6 +121,16 @@ export async function handleCronBrokerRadar(auth?: string): Promise<HandlerResul
       status: 200,
       body: { ok: true, refreshed, refreshedAt: new Date().toISOString() },
     };
+  } catch (err) {
+    return SERVER_ERROR(err);
+  }
+}
+
+// ── swing trade candidates (Section 13c) ─────────────────────────────────
+
+export async function handleSwingCandidates(): Promise<HandlerResult> {
+  try {
+    return { status: 200, body: await getSwingCandidates() };
   } catch (err) {
     return SERVER_ERROR(err);
   }
