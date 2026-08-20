@@ -782,6 +782,15 @@ Corporate action data must come from live public sources, not mock data (Section
 
 Do **not** add a new Cron Job for this. Fetch live on-demand with the same short-lived cache/stale-while-revalidate pattern already used elsewhere (Section 25) — this is a lighter, less frequently-changing data type than broker summary and doesn't need its own scheduled job.
 
+**Classification must handle negation, denial, and rumor language, not just raw keywords.** A title containing "akuisisi" is not automatically positive — check for negating/qualifying words around it:
+
+* Denial/refutation ("bantah", "tidak benar", "belum ada kepastian", "membantah kabar", "klarifikasi") → the underlying event keyword should NOT drive a positive score; classify as `NEUTRAL` (it's a denial/rumor being reported, not a confirmed positive catalyst) unless the denial itself is clearly bad news for the stock, in which case use judgment case-by-case rather than a blanket rule.
+* Cancellation ("batal", "dibatalkan", "ditunda", "gagal") on an otherwise-positive event type (e.g. "BIKE Batal Akuisisi LGA") → this is `NEUTRAL` or `NEGATIVE` depending on context, never `POSITIVE`, even though the title contains "Akuisisi."
+* Rumor/unconfirmed framing ("rumor", "isu", "kabar", "dikabarkan", "belum dikonfirmasi") without an official confirmation → lean toward `NEUTRAL` with a lower catalyst score, since it's speculative.
+* Only classify as `POSITIVE`/`NEGATIVE` with a meaningful catalyst score when the headline reflects a confirmed or strongly-indicated event, not a denial, cancellation, or unconfirmed rumor.
+
+The keyword/rule mapping table should be structured so these negation/qualifier words are checked first and can flip or dampen the base classification of the event-type keyword — not just a flat list of "these keywords = positive."
+
 Use demo data only for local dev/testing (Section 19), never in production.
 
 ---
