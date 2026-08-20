@@ -15,6 +15,7 @@ import type {
   StockDetail,
   TimeRange,
 } from "../types";
+import { MockMarketDataProvider } from "./mockProvider";
 
 export interface MarketDataProvider {
   getMarketOverview(): Promise<MarketOverview>;
@@ -115,5 +116,18 @@ export class ApiMarketDataProvider implements MarketDataProvider {
   }
 }
 
-/** Singleton provider used by the app. */
-export const marketDataProvider: MarketDataProvider = new ApiMarketDataProvider();
+/** Singleton provider used by the app.
+ *
+ * Production default is ALWAYS the live API provider. The mock provider is
+ * only selected when `VITE_USE_MOCK_DATA=true` is set in local dev — and the
+ * UI shows a persistent warning banner while it is active.
+ */
+export const useMockData =
+  (import.meta.env.VITE_USE_MOCK_DATA ?? "false") === "true";
+
+function resolveProvider(): MarketDataProvider {
+  if (!useMockData) return new ApiMarketDataProvider();
+  return new MockMarketDataProvider();
+}
+
+export const marketDataProvider: MarketDataProvider = resolveProvider();

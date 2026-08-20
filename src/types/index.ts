@@ -50,6 +50,13 @@ export interface ScoredStock {
   rsi: number; // RSI-14
   atr: number; // ATR-14 in IDR
   priceVs52w: number; // 0-100 position within the 52-week range
+
+  // Bandarmology / volume authenticity (Section 13a/13b) — computed from the
+  // broker source and OHLCV respectively; undefined when data is unavailable
+  // for this ticker (UI shows an explicit unavailable state, never a fake 0).
+  brokerAccumulationScore?: number; // 0-100
+  brokerTier?: "A" | "B" | "C";
+  volumeAuthenticityScore?: number; // 0-100
 }
 
 /** Stock-detail extras (zones, fundamentals, large-activity proxy). */

@@ -1,6 +1,7 @@
-import { Info, Satellite } from "lucide-react";
+import { AlertTriangle, Info, Satellite } from "lucide-react";
 import { Badge } from "./ui/Badge";
 import { formatDateTimeWIB, isMarketOpenWIB } from "../utils/format";
+import { useMockData } from "../services/marketData";
 
 const SOURCE_NOTE =
   "Market data is provided by a free public market-data source and may be delayed.";
@@ -21,6 +22,19 @@ export function DataStatusBadge() {
  */
 export function DataStatusBanner({ updatedAt }: { updatedAt?: string }) {
   const open = isMarketOpenWIB();
+
+  // Local dev only (VITE_USE_MOCK_DATA=true): Section 19 requires explicit
+  // disclosure whenever fixture data is shown — never silently.
+  if (useMockData) {
+    return (
+      <div className="flex flex-wrap items-center justify-center gap-x-2 border-b border-critical/30 bg-critical/10 px-4 py-1.5 text-center text-[11px] font-semibold text-critical">
+        <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+        MOCK DATA MODE — development fixtures, not real market data. Disable
+        VITE_USE_MOCK_DATA for live data.
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 border-b border-white/5 bg-surface2/40 px-4 py-1.5 text-center text-[11px] font-medium">
       <span className={open ? "text-warn" : "text-ink2"}>
