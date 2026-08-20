@@ -3,6 +3,7 @@ import { Badge } from "../../components/ui/Badge";
 import { ProgressBar } from "../../components/ui/ProgressBar";
 import { EmptyState } from "../../components/states";
 import { cn } from "../../lib/utils";
+import { formatDateTimeWIB } from "../../utils/format";
 
 function SignalRow({ label, state }: { label: string; state: "yes" | "no" | "na" }) {
   return (
@@ -26,7 +27,15 @@ function SignalRow({ label, state }: { label: string; state: "yes" | "no" | "na"
  * summary. Signals that need tick/trade data (frequency ratio, spread) are
  * shown as "n/a" — the free daily-bar source does not provide them.
  */
-export function VolumeQualityPanel({ stock }: { stock?: StockDetail; ticker: string }) {
+export function VolumeQualityPanel({
+  stock,
+  updatedAt,
+}: {
+  stock?: StockDetail;
+  ticker: string;
+  /** ISO timestamp of the quote data the assessment was derived from. */
+  updatedAt?: string;
+}) {
   const va: VolumeAuthenticity | undefined = stock?.volumeAuthenticity;
 
   if (!va) {
@@ -56,6 +65,14 @@ export function VolumeQualityPanel({ stock }: { stock?: StockDetail; ticker: str
           <ProgressBar value={va.score} />
         </div>
       </div>
+
+      {updatedAt && (
+        <p className="text-[11px] text-muted">
+          Data as of:{" "}
+          <span className="num font-semibold text-ink2">{formatDateTimeWIB(updatedAt)}</span>
+          {" · "}assessed from the latest daily bars of the free data source.
+        </p>
+      )}
 
       {!genuine && va.score < 40 && (
         <div className="rounded-lg border border-critical/30 bg-critical/10 p-3">

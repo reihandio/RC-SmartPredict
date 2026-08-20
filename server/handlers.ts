@@ -19,6 +19,10 @@ import { getSwingCandidates } from "./swingService.js";
 export interface HandlerResult {
   status: number;
   body: Record<string, unknown>;
+  /** Background refresh started while serving stale data (SWR). Vercel API
+   *  wrappers keep it alive with waitUntil so the cache is updated for the
+   *  next request; the vite dev middleware simply lets it run in-process. */
+  waitUntil?: Promise<unknown>;
 }
 
 const SERVER_ERROR = (err?: unknown): HandlerResult => {
@@ -84,14 +88,14 @@ export async function handleEvents(): Promise<HandlerResult> {
 
 export async function handleBrokerSummary(ticker: string): Promise<HandlerResult> {
   try {
-    const summary = await getBrokerSummary(ticker);
+    const { summary, refresh } = await getBrokerSummary(ticker);
     if (!summary) {
       return {
         status: 404,
         body: { error: "Broker data unavailable for this ticker." },
       };
     }
-    return { status: 200, body: { summary } };
+    return { status: 200, body: { summary }, waitUntil: refresh };
   } catch (err) {
     return SERVER_ERROR(err);
   }
@@ -99,7 +103,8 @@ export async function handleBrokerSummary(ticker: string): Promise<HandlerResult
 
 export async function handleBrokerRadar(): Promise<HandlerResult> {
   try {
-    return { status: 200, body: await getBrokerRadar() };
+    const { entries, updatedAt, refresh } = await getBrokerRadar();
+    return { status: 200, body: { entries, updatedAt }, waitUntil: refresh };
   } catch (err) {
     return SERVER_ERROR(err);
   }

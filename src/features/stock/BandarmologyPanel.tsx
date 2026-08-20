@@ -3,6 +3,10 @@ import { marketDataProvider } from "../../services/marketData";
 import { LoadingState, EmptyState, ErrorState } from "../../components/states";
 import { BrokerTierBadge } from "../broker-radar/BrokerTierBadge";
 import { BrokerAccumulationTable } from "../broker-radar/BrokerAccumulationTable";
+import { formatDateTimeWIB } from "../../utils/format";
+
+/** Beyond 24 h the summary is labelled stale (same horizon as the radar). */
+const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Bandarmology tab (Section 13a) — live per-broker net buy/sell over
@@ -41,6 +45,9 @@ export function BandarmologyPanel({ ticker }: { ticker: string }) {
     );
   }
 
+  const stale =
+    Date.now() - new Date(summary.updatedAt).getTime() > STALE_AFTER_MS;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -54,6 +61,20 @@ export function BandarmologyPanel({ ticker }: { ticker: string }) {
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
           {summary.dominantParty.replace(/_/g, " ")}-led · concentration {summary.concentrationRisk}%
         </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
+        <span>
+          Last updated:{" "}
+          <span className="num font-semibold text-ink2">
+            {formatDateTimeWIB(summary.updatedAt)}
+          </span>
+        </span>
+        {stale && (
+          <span className="rounded bg-warn/15 px-1.5 py-0.5 text-[10px] font-semibold text-warn">
+            STALE — refreshed once daily plus on demand
+          </span>
+        )}
       </div>
 
       <div className="rounded-lg border border-white/5 bg-surface2/40 p-3">
