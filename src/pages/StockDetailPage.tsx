@@ -152,7 +152,7 @@ export default function StockDetailPage() {
               <IntelligenceSummary stock={data.stock} />
               <MoneyFlowDetail stock={data.stock} />
               {/* NEW (13a/13b): Bandarmology + Volume Quality tabs — additive */}
-              <BrokerVolumeTabs ticker={t} stock={data.stock} />
+              <BrokerVolumeTabs ticker={t} stock={data.stock} updatedAt={data.updatedAt} />
             </div>
 
             <div className="space-y-5">

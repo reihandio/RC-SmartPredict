@@ -13,7 +13,16 @@ type TabId = "bandarmology" | "volume-quality";
  * Quality tabs below the chart, alongside the existing intelligence cards.
  * Purely additive — existing sections above/below are untouched.
  */
-export function BrokerVolumeTabs({ ticker, stock }: { ticker: string; stock: StockDetail }) {
+export function BrokerVolumeTabs({
+  ticker,
+  stock,
+  updatedAt,
+}: {
+  ticker: string;
+  stock: StockDetail;
+  /** ISO timestamp of the underlying quote data (for "last updated" display). */
+  updatedAt?: string;
+}) {
   const [tab, setTab] = useState<TabId>("bandarmology");
 
   const tabs: { id: TabId; label: string; icon: typeof BarChart3 }[] = [
@@ -45,7 +54,7 @@ export function BrokerVolumeTabs({ ticker, stock }: { ticker: string; stock: Sto
       {tab === "bandarmology" ? (
         <BandarmologyPanel ticker={ticker} />
       ) : (
-        <VolumeQualityPanel ticker={ticker} stock={stock} />
+        <VolumeQualityPanel ticker={ticker} stock={stock} updatedAt={updatedAt} />
       )}
     </Card>
   );

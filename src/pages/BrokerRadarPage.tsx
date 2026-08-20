@@ -48,6 +48,13 @@ export default function BrokerRadarPage() {
           broker-summary source. Coverage fills in progressively via a scheduled precompute; a
           ticker shows once its summary has been computed.
         </p>
+        {data?.updatedAt && (
+          <p className="mt-1 text-[11px] text-muted">
+            Last data update:{" "}
+            <span className="num font-semibold text-ink2">{formatDateTimeWIB(data.updatedAt)}</span>
+            {" · "}refreshed by a once-daily schedule plus on-demand background refreshes.
+          </p>
+        )}
       </div>
 
       <Card className="card-pad fade-up" style={{ animationDelay: "60ms" }}>
@@ -71,7 +78,6 @@ export default function BrokerRadarPage() {
           </div>
           <span className="num text-xs text-muted">
             {withData.length} analyzed{pending > 0 ? ` · ${pending} collecting data` : ""}
-            {data?.updatedAt ? ` · updated ${formatDateTimeWIB(data.updatedAt)}` : ""}
           </span>
         </div>
 
@@ -127,6 +133,11 @@ function RadarRow({ entry }: { entry: BrokerRadarEntry }) {
         <div className="flex items-center gap-2">
           {entry.status === "STALE" && (
             <span className="text-[10px] font-semibold text-warn">STALE</span>
+          )}
+          {entry.status === "STALE" && (
+            <span className="text-[10px] text-muted">
+              updated {formatDateTimeWIB(s.updatedAt)}
+            </span>
           )}
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
             {s.dominantParty.replace(/_/g, " ")}

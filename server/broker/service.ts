@@ -8,9 +8,11 @@
  *
  * Two usage paths:
  *  - on-demand:  /api/broker-summary/[ticker]  → getBrokerSummary(ticker)
- *  - precomputed: /api/cron/broker-radar (Vercel Cron) → refreshRadarSlice(),
- *    and /api/broker-radar → getBrokerRadar() which serves cached entries and
- *    opportunistically fills a small number of missing/stale ones per request.
+ *  - precomputed: /api/cron/broker-radar (Vercel Cron, ONCE daily on the
+ *    Hobby plan) → refreshRadarSlice(), and /api/broker-radar →
+ *    getBrokerRadar() which serves cached entries, synchronously fills a
+ *    small number of missing ones, and background-refreshes a bounded number
+ *    of stale ones (stale-while-revalidate — see the SWR constants below).
  */
 import type {
   BrokerAccumulationSummary,
@@ -24,8 +26,23 @@ import { buildBrokerAccumulationSummary, buildWindow } from "./scoring.js";
 
 const SUMMARY_TTL_SECONDS = 6 * 60 * 60; // 6 h — Bandarmology windows move daily
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000; // radar shows "stale" beyond 24 h
+
+// Stale-while-revalidate (SWR) horizons — cron on the Vercel Hobby plan is
+// limited to ONE run per day, so on-demand requests carry freshness between
+// cron runs:
+//  · age < FRESH:                serve as-is
+//  · FRESH ≤ age < MAX_STALE:    serve immediately + refresh in background
+//  · age ≥ MAX_STALE:            too old to serve — recompute synchronously
+const SUMMARY_FRESH_MS = SUMMARY_TTL_SECONDS * 1000;
+const SUMMARY_MAX_STALE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+const SUMMARY_RETENTION_SECONDS = 4 * 24 * 60 * 60; // KV key lives 4 days (≥ max stale)
+/** Per-request cap on background refreshes so a radar page load can never
+ *  turn into a per-minute-cron-style scrape storm. */
+const MAX_STALE_REFRESHES_PER_REQUEST = 6;
 const INDEX_KEY = "broker:index";
 const sumKey = (ticker: string) => `broker:summary:${ticker.toUpperCase()}`;
+
+const ageMs = (iso: string): number => Date.now() - new Date(iso).getTime();
 
 // ── date helpers ─────────────────────────────────────────────────────────
 
@@ -121,23 +138,74 @@ export async function getCachedBrokerSummary(
   return store.get<BrokerAccumulationSummary>(sumKey(ticker.toUpperCase()));
 }
 
-/** On-demand summary for one ticker (Stock Detail tab). Cached 6 h. */
+// ── stale-while-revalidate (SWR) ─────────────────────────────────────────
+
+// In-flight refreshes per ticker (per warm instance) — dedupes concurrent
+// requests so a stale ticker is scraped at most once at a time.
+const inflightRefreshes = new Map<string, Promise<void>>();
+
+/** Start (or join) a background refresh for one ticker. Never rejects;
+ *  returns a promise that resolves when the refresh finishes so callers on
+ *  Vercel can keep it alive with waitUntil after responding. */
+export function scheduleBrokerRefresh(ticker: string): Promise<void> {
+  const t = ticker.toUpperCase();
+  const existing = inflightRefreshes.get(t);
+  if (existing) return existing;
+
+  const p = (async () => {
+    try {
+      const summary = await computeSummary(t, latestTradingDay());
+      if (summary) {
+        await brokerCache().set(sumKey(t), summary, SUMMARY_RETENTION_SECONDS);
+        await touchIndex(t);
+      }
+    } catch (err) {
+      console.error(`[broker] background refresh failed for ${t}:`, err);
+    }
+  })().finally(() => inflightRefreshes.delete(t));
+  inflightRefreshes.set(t, p);
+  return p;
+}
+
+export interface BrokerSummaryResult {
+  summary: BrokerAccumulationSummary | null;
+  /** Settled by the background refresh started because the served summary
+   *  was stale (SWR). Undefined when nothing was scheduled. */
+  refresh?: Promise<void>;
+}
+
+/**
+ * On-demand summary for one ticker (Stock Detail tab).
+ * SWR: ≤ 6 h old is served as-is; 6 h–3 days old is served immediately with
+ * a background refresh; older or missing is recomputed synchronously.
+ */
 export async function getBrokerSummary(
   ticker: string,
-): Promise<BrokerAccumulationSummary | null> {
+): Promise<BrokerSummaryResult> {
   const t = ticker.toUpperCase();
   const store = brokerCache();
   const hit = await store.get<BrokerAccumulationSummary>(sumKey(t));
-  if (hit && Date.now() - new Date(hit.updatedAt).getTime() < SUMMARY_TTL_SECONDS * 1000) {
-    return hit;
+  if (hit) {
+    const age = ageMs(hit.updatedAt);
+    if (age < SUMMARY_FRESH_MS) return { summary: hit };
+    if (age < SUMMARY_MAX_STALE_MS) {
+      return { summary: hit, refresh: scheduleBrokerRefresh(t) };
+    }
+    // fall through: too old to serve — recompute synchronously
   }
 
   const summary = await computeSummary(t, latestTradingDay());
   if (summary) {
-    await store.set(sumKey(t), summary, SUMMARY_TTL_SECONDS);
+    await store.set(sumKey(t), summary, SUMMARY_RETENTION_SECONDS);
     await touchIndex(t);
+    return { summary };
   }
-  return summary;
+  if (hit) {
+    // source temporarily unavailable — keep serving the stale copy and retry
+    // in the background rather than showing an error for old-but-real data
+    return { summary: hit, refresh: scheduleBrokerRefresh(t) };
+  }
+  return { summary: null };
 }
 
 // ── radar index (last-refresh bookkeeping) ───────────────────────────────
@@ -160,10 +228,16 @@ export interface BrokerRadarEntry {
   status: "FRESH" | "STALE" | "PENDING";
 }
 
-/** Cached radar over the whole watchlist, with a bounded opportunistic fill. */
+/**
+ * Cached radar over the whole watchlist. PENDING tickers (no cached summary
+ * yet) are filled synchronously in a bounded number so the request stays
+ * fast; STALE ones are served as-is (SWR) with a bounded number of
+ * background refreshes — a page load must never turn into a scrape storm.
+ */
 export async function getBrokerRadar(maxFill = 6): Promise<{
   entries: Array<{ ticker: string } & BrokerRadarEntry>;
   updatedAt: string;
+  refresh?: Promise<void>;
 }> {
   const store = brokerCache();
   const tickers = WATCHLIST.map((s) => s.replace(/\.JK$/i, ""));
@@ -175,7 +249,7 @@ export async function getBrokerRadar(maxFill = 6): Promise<{
       entries.push({ ticker: t, summary: null, status: "PENDING" });
       continue;
     }
-    const age = Date.now() - new Date(summary.updatedAt).getTime();
+    const age = ageMs(summary.updatedAt);
     entries.push({
       ticker: t,
       summary,
@@ -183,11 +257,8 @@ export async function getBrokerRadar(maxFill = 6): Promise<{
     });
   }
 
-  // opportunistic fill: newest missing/stale first, bounded so the request stays fast
-  const toFill = entries
-    .filter((e) => e.status === "PENDING" || e.status === "STALE")
-    .slice(0, maxFill);
-
+  // missing entries have nothing to serve — fill a bounded few synchronously
+  const toFill = entries.filter((e) => e.status === "PENDING").slice(0, maxFill);
   if (toFill.length > 0) {
     await fillTickers(toFill.map((e) => e.ticker), 2);
     for (const e of toFill) {
@@ -199,7 +270,27 @@ export async function getBrokerRadar(maxFill = 6): Promise<{
     }
   }
 
-  return { entries, updatedAt: new Date().toISOString() };
+  // stale entries: serve + background-refresh, oldest first, bounded
+  const toRefresh = entries
+    .filter((e): e is { ticker: string } & BrokerRadarEntry & { summary: BrokerAccumulationSummary } =>
+      e.status === "STALE" && e.summary !== null,
+    )
+    .sort((a, b) => a.summary.updatedAt.localeCompare(b.summary.updatedAt))
+    .slice(0, MAX_STALE_REFRESHES_PER_REQUEST);
+  const refresh =
+    toRefresh.length > 0
+      ? Promise.allSettled(toRefresh.map((e) => scheduleBrokerRefresh(e.ticker))).then(
+          () => undefined,
+        )
+      : undefined;
+
+  // honest freshness: newest summary computation time across entries, not "now"
+  const newest = entries.reduce<string | null>(
+    (max, e) => (e.summary && (max === null || e.summary.updatedAt > max) ? e.summary.updatedAt : max),
+    null,
+  );
+
+  return { entries, updatedAt: newest ?? new Date().toISOString(), refresh };
 }
 
 /** Fill (or refresh) a batch of tickers with bounded concurrency. */
@@ -217,7 +308,7 @@ async function fillTickers(tickers: string[], concurrency: number): Promise<void
       try {
         const summary = await computeSummary(t, endDate);
         if (summary) {
-          await store.set(sumKey(t), summary, SUMMARY_TTL_SECONDS);
+          await store.set(sumKey(t), summary, SUMMARY_RETENTION_SECONDS);
           await touchIndex(t);
         }
       } catch (err) {
@@ -229,8 +320,13 @@ async function fillTickers(tickers: string[], concurrency: number): Promise<void
   await Promise.all(Array.from({ length: Math.min(concurrency, tickers.length) }, worker));
 }
 
-/** Cron entry point: refresh the N oldest-cached tickers (rotating coverage). */
-export async function refreshRadarSlice(batchSize = 8): Promise<{ refreshed: string[] }> {
+/**
+ * Cron entry point: refresh the N oldest-cached tickers (rotating coverage).
+ * The cron now runs only ONCE per day (Vercel Hobby limit), so the batch is
+ * sized to make a full watchlist rotation in roughly a week while staying
+ * inside the 60 s function budget — on-demand SWR carries the rest.
+ */
+export async function refreshRadarSlice(batchSize = 10): Promise<{ refreshed: string[] }> {
   const store = brokerCache();
   const tickers = WATCHLIST.map((s) => s.replace(/\.JK$/i, ""));
   const idx = await readIndex();
@@ -246,7 +342,7 @@ export async function refreshRadarSlice(batchSize = 8): Promise<{ refreshed: str
   const refreshed: string[] = [];
   for (const t of slice) {
     const s = await store.get<BrokerAccumulationSummary>(sumKey(t));
-    if (s && Date.now() - new Date(s.updatedAt).getTime() < SUMMARY_TTL_SECONDS * 1000) {
+    if (s && ageMs(s.updatedAt) < SUMMARY_FRESH_MS) {
       refreshed.push(t);
     }
   }
