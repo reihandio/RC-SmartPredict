@@ -109,6 +109,18 @@ async function computeSummary(
 
 // ── public API ───────────────────────────────────────────────────────────
 
+/**
+ * Cache-only read (no compute): used by the stock-detail path to cross-
+ * reference volume authenticity without slowing the response down. Null when
+ * the summary has not been precomputed yet.
+ */
+export async function getCachedBrokerSummary(
+  ticker: string,
+): Promise<BrokerAccumulationSummary | null> {
+  const store = brokerCache();
+  return store.get<BrokerAccumulationSummary>(sumKey(ticker.toUpperCase()));
+}
+
 /** On-demand summary for one ticker (Stock Detail tab). Cached 6 h. */
 export async function getBrokerSummary(
   ticker: string,

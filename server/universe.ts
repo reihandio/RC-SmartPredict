@@ -14,6 +14,8 @@ import {
   pctReturn,
   scoreStock,
 } from "./analytics.js";
+import { volumeAuthenticity } from "./volumeAuthenticity.js";
+import { getCachedBrokerSummary } from "./broker/service.js";
 
 // ── tiny in-memory TTL cache (per warm instance) ───────────────────────
 
@@ -77,7 +79,9 @@ async function computeUniverse(): Promise<{ stocks: ScoredStock[]; updatedAt: st
   const scored = await mapLimit(quotes, 6, async (q) => {
     const chart = await getDailyHistory(q.symbol, 80, true);
     if (chart.bars.length < 22) return null;
-    return scoreStock(q, chart, ihsg20d);
+    // cache-only broker read: consistent VA cross-reference without slow scrapes
+    const broker = await getCachedBrokerSummary(q.symbol.replace(/\.JK$/i, "")).catch(() => null);
+    return scoreStock(q, chart, ihsg20d, broker ? { score: broker.score, tier: broker.tier } : null);
   });
 
   const updatedAt = quotes.reduce(
@@ -156,8 +160,26 @@ async function computeStockDetail(ticker: string) {
   if (chart.bars.length < 22) return null;
 
   const ihsg20d = ihsgChart ? pctReturn(ihsgChart.bars.map((b) => b.close), 20) : null;
-  const stock = scoreStock(quote, chart, ihsg20d);
+  // cache-only broker read (Section 13b cross-reference) — never blocks the
+  // detail response on a fresh scrape
+  const broker = await getCachedBrokerSummary(symbol.replace(/\.JK$/i, "")).catch(() => null);
+  const stock = scoreStock(
+    quote,
+    chart,
+    ihsg20d,
+    broker ? { score: broker.score, tier: broker.tier } : null,
+  );
   const detail = buildStockDetail(stock, chart, fundamentals);
+
+  // Section 13b: full authenticity assessment with the same broker context
+  detail.volumeAuthenticity = {
+    ...volumeAuthenticity(chart.bars, {
+      brokerAccumulationScore: broker?.score ?? null,
+      brokerTier: broker?.tier ?? null,
+      marketCap: quote.marketCap,
+    }),
+    ticker: symbol.replace(/\.JK$/i, ""),
+  };
 
   const actions = corporateActionsFromEvents(chart.events, quote);
   return { stock: detail, actions, updatedAt: quote.updatedAt };

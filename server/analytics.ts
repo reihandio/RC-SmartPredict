@@ -15,6 +15,7 @@ import type {
   StockDetail,
 } from "../src/types/index.js";
 import type { YahooBar, YahooChart, YahooEvent, YahooQuote } from "./yahoo.js";
+import { volumeAuthenticity } from "./volumeAuthenticity.js";
 
 export const clamp = (v: number, min = 0, max = 100): number => Math.min(max, Math.max(min, v));
 export const round1 = (v: number): number => Math.round(v * 10) / 10;
@@ -234,9 +235,17 @@ export function technicalScore(bars: YahooBar[]): number {
 /**
  * Anomaly Risk (0-100) from real OHLCV features:
  * volume spike, price spike, intraday reversal, price/volume divergence,
- * volatility expansion, low liquidity.
+ * volatility expansion, low liquidity — plus (Section 13b) the Volume
+ * Authenticity score: low authenticity pushes risk up. When the
+ * authenticity score is unavailable the historical factors still apply
+ * unchanged (the extra term is simply skipped).
  */
-export function anomalyRisk(bars: YahooBar[], vr: number, avgValue20d: number): number {
+export function anomalyRisk(
+  bars: YahooBar[],
+  vr: number,
+  avgValue20d: number,
+  volumeAuthenticityScore?: number,
+): number {
   let risk = 0;
   const last = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
@@ -272,6 +281,11 @@ export function anomalyRisk(bars: YahooBar[], vr: number, avgValue20d: number): 
 
   // low liquidity
   if (avgValue20d > 0 && avgValue20d < 2e9) risk += 10;
+
+  // Section 13b factor: low volume authenticity → elevated anomaly risk
+  if (volumeAuthenticityScore !== undefined) {
+    risk += Math.max(0, 100 - volumeAuthenticityScore) * 0.25;
+  }
 
   return Math.round(clamp(risk, 0, 100));
 }
@@ -405,6 +419,8 @@ export function scoreStock(
   quote: YahooQuote,
   chart: YahooChart,
   ihsg20dReturn: number | null,
+  /** Cached Bandarmology context (Section 13a) for the VA cross-reference; null = unknown. */
+  broker?: { score: number; tier: string } | null,
 ): ScoredStock {
   const bars = chart.bars;
   const closes = bars.map((b) => b.close);
@@ -420,7 +436,14 @@ export function scoreStock(
     ? values20.reduce((x, y) => x + y, 0) / values20.length
     : 0;
 
-  const anomaly = anomalyRisk(bars, vr, avgValue20d);
+  // Volume authenticity (Section 13b) — same real bars; broker cross-reference
+  // included when the cached Bandarmology summary is available.
+  const va = volumeAuthenticity(bars, {
+    brokerAccumulationScore: broker?.score ?? null,
+    brokerTier: broker?.tier ?? null,
+    marketCap: quote.marketCap,
+  });
+  const anomaly = anomalyRisk(bars, vr, avgValue20d, va.score);
   const catalyst = catalystScore(chart.events, quote.price);
   const volScore = volumeScore(vr, flow.flow20d);
   const technical = technicalScore(bars);
@@ -469,6 +492,7 @@ export function scoreStock(
     rsi: Math.round(r),
     atr: a !== null ? round1(a) : 0,
     priceVs52w,
+    volumeAuthenticityScore: va.score,
   };
 }
 

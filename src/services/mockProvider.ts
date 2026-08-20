@@ -291,6 +291,7 @@ function toScoredStock(f: FixtureDef): ScoredStock {
 
 function toDetail(f: FixtureDef): StockDetail {
   const s = toScoredStock(f);
+  const genuine = (f.volumeAuthenticityScore ?? 60) >= 60;
   return {
     ...s,
     sector: "Consumer Cyclical",
@@ -308,6 +309,16 @@ function toDetail(f: FixtureDef): StockDetail {
     momentum: f.moneyFlowScore > 60 ? "STRONG" : "MODERATE",
     distributionRisk: f.moneyFlowScore > 60 ? "LOW" : "MODERATE",
     largeActivity: [],
+    volumeAuthenticity: {
+      ticker: f.ticker,
+      score: f.volumeAuthenticityScore ?? 60,
+      classification: genuine ? "GENUINE" : "SUSPICIOUS",
+      frequencyToVolumeRatio: null,
+      priceHeldAfterSpike: genuine,
+      spreadStability: null,
+      correlatesWithBrokerAccumulation: (f.brokerTier ?? "C") !== "C",
+      redFlags: genuine ? [] : ["FIXTURE — volume spike with flat close"],
+    },
   };
 }
 

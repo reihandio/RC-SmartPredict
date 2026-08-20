@@ -81,6 +81,9 @@ export interface StockDetail extends ScoredStock {
   distributionRisk: "LOW" | "MODERATE" | "HIGH";
 
   largeActivity: LargeActivityEvent[];
+
+  /** Full Section 13b assessment (with red flags) — undefined when unavailable. */
+  volumeAuthenticity?: VolumeAuthenticity;
 }
 
 export type ActivityClass = "NORMAL" | "LARGE" | "ACCUMULATION-LIKE" | "DISTRIBUTION-LIKE" | "ANOMALOUS";
@@ -202,7 +205,8 @@ export interface VolumeAuthenticity {
   frequencyToVolumeRatio: number | null; // null = not available from the free daily-bar source
   priceHeldAfterSpike: boolean;
   spreadStability: number | null; // 0-100; null = not available
-  correlatesWithBrokerAccumulation: boolean;
+  // null = broker data unavailable, correlation not assessed (honest "n/a")
+  correlatesWithBrokerAccumulation: boolean | null;
   redFlags: string[];
 }
 

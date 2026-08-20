@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BarChart3, Waves } from "lucide-react";
+import type { StockDetail } from "../../types";
 import { cn } from "../../lib/utils";
 import { Card } from "../../components/ui/Card";
 import { BandarmologyPanel } from "./BandarmologyPanel";
@@ -12,7 +13,7 @@ type TabId = "bandarmology" | "volume-quality";
  * Quality tabs below the chart, alongside the existing intelligence cards.
  * Purely additive — existing sections above/below are untouched.
  */
-export function BrokerVolumeTabs({ ticker }: { ticker: string }) {
+export function BrokerVolumeTabs({ ticker, stock }: { ticker: string; stock: StockDetail }) {
   const [tab, setTab] = useState<TabId>("bandarmology");
 
   const tabs: { id: TabId; label: string; icon: typeof BarChart3 }[] = [
@@ -44,7 +45,7 @@ export function BrokerVolumeTabs({ ticker }: { ticker: string }) {
       {tab === "bandarmology" ? (
         <BandarmologyPanel ticker={ticker} />
       ) : (
-        <VolumeQualityPanel ticker={ticker} />
+        <VolumeQualityPanel ticker={ticker} stock={stock} />
       )}
     </Card>
   );
