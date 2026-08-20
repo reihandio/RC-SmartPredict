@@ -10,6 +10,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 
 // The chart library is heavy — load the stock page on demand.
 const StockDetailPage = lazy(() => import("./pages/StockDetailPage"));
+const BrokerRadarPage = lazy(() => import("./pages/BrokerRadarPage"));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -36,6 +37,14 @@ export default function App() {
             }
           />
           <Route path="money-flow" element={<MoneyFlowPage />} />
+          <Route
+            path="broker-radar"
+            element={
+              <Suspense fallback={<LoadingState label="Loading broker radar…" />}>
+                <BrokerRadarPage />
+              </Suspense>
+            }
+          />
           <Route path="corporate-actions" element={<CorporateActionsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

@@ -11,6 +11,7 @@
  * persistent "MOCK DATA" warning banner (see DataStatusNotice.tsx).
  */
 import type {
+  BrokerAccumulationSummary,
   CorporateAction,
   MarketOverview,
   PriceData,
@@ -18,7 +19,7 @@ import type {
   StockDetail,
   TimeRange,
 } from "../types";
-import type { MarketDataProvider } from "./marketData";
+import type { BrokerRadarEntry, MarketDataProvider } from "./marketData";
 
 // ── fixture universe (10 stocks covering the Section 19 scenarios) ──────
 
@@ -371,6 +372,46 @@ const FIXTURE_ACTIONS: CorporateAction[] = [
   },
 ];
 
+// ── broker fixtures (dev only — two representative cases) ────────────────
+
+function brokerFixture(
+  ticker: string,
+  tier: "A" | "B" | "C",
+  score: number,
+  topBuyers: string[],
+  reason: string,
+): BrokerAccumulationSummary {
+  const mk = (code: string, netB: number, type: BrokerAccumulationSummary["windows"][number]["topNetBuyers"][number]["brokerType"]) => ({
+    brokerCode: code,
+    brokerName: code,
+    brokerType: type,
+    netVolume: Math.round(netB * 10),
+    netValue: netB * 1e9,
+    buyVolume: Math.round(netB * 14),
+    sellVolume: Math.round(netB * 4),
+    ownershipPercent: 0.1,
+  });
+  const ranges = ["7D", "14D", "30D"] as const;
+  return {
+    ticker,
+    windows: ranges.map((range, i) => ({
+      range,
+      topNetBuyers: topBuyers.map((c, j) => mk(c, 40 - i * 8 - j * 5, i % 2 === 0 ? "FOREIGN" : "DOMESTIC")),
+      topNetSellers: [mk("CC", -20, "DOMESTIC")],
+      totalValue: 5000e9 - i * 1000e9,
+      foreignNetValue: 120e9 - i * 30e9,
+    })),
+    consistentAcrossWindows: tier === "A",
+    dominantParty: "MIXED",
+    concentrationRisk: tier === "C" ? 68 : 34,
+    tier,
+    tierReason: `FIXTURE — ${reason}`,
+    score,
+    updatedAt: UPDATED_AT,
+    source: "LIVE",
+  };
+}
+
 export class MockMarketDataProvider implements MarketDataProvider {
   readonly kind = "mock";
 
@@ -419,5 +460,26 @@ export class MockMarketDataProvider implements MarketDataProvider {
 
   async getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string }> {
     return { actions: FIXTURE_ACTIONS, updatedAt: UPDATED_AT };
+  }
+
+  async getBrokerSummary(ticker: string): Promise<BrokerAccumulationSummary | null> {
+    const t = ticker.toUpperCase();
+    if (t === "BBCA") {
+      return brokerFixture("BBCA", "A", 84, ["ZP", "BK", "RX"], "consistent net buying 7/14/30D");
+    }
+    if (t === "ADRO") {
+      return brokerFixture("ADRO", "B", 66, ["YU", "NI"], "14/30D visible, 7D mixed");
+    }
+    return null; // → UI shows "Broker data unavailable"
+  }
+
+  async getBrokerRadar(): Promise<{ entries: BrokerRadarEntry[]; updatedAt: string }> {
+    const entries: BrokerRadarEntry[] = FIXTURES.map((f) => {
+      if (f.ticker === "BBCA" || f.ticker === "ADRO") {
+        return { ticker: f.ticker, summary: brokerFixture(f.ticker, "A", 84, ["ZP", "BK"], "fixture"), status: "FRESH" as const };
+      }
+      return { ticker: f.ticker, summary: null, status: "PENDING" as const };
+    });
+    return { entries, updatedAt: UPDATED_AT };
   }
 }

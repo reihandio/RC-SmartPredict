@@ -8,6 +8,7 @@
  * navigating between pages.
  */
 import type {
+  BrokerAccumulationSummary,
   CorporateAction,
   MarketOverview,
   PriceData,
@@ -16,6 +17,13 @@ import type {
   TimeRange,
 } from "../types";
 import { MockMarketDataProvider } from "./mockProvider";
+
+/** Radar entry: cached Bandarmology summary + freshness status. */
+export interface BrokerRadarEntry {
+  ticker: string;
+  summary: BrokerAccumulationSummary | null;
+  status: "FRESH" | "STALE" | "PENDING";
+}
 
 export interface MarketDataProvider {
   getMarketOverview(): Promise<MarketOverview>;
@@ -27,6 +35,9 @@ export interface MarketDataProvider {
   }>;
   getHistoricalPrices(ticker: string, range: TimeRange): Promise<PriceData[]>;
   getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string }>;
+  /** Bandarmology (Section 13a). Null = data unavailable (never a fake zero). */
+  getBrokerSummary(ticker: string): Promise<BrokerAccumulationSummary | null>;
+  getBrokerRadar(): Promise<{ entries: BrokerRadarEntry[]; updatedAt: string }>;
 }
 
 // ── tiny TTL cache (per session) ────────────────────────────────────────
@@ -67,6 +78,8 @@ const QUOTE_TTL = 60 * 1000; // quotes/overview: 1 min
 const UNIVERSE_TTL = 60 * 1000;
 const HISTORY_TTL = 10 * 60 * 1000; // charts rarely change
 const EVENTS_TTL = 30 * 60 * 1000;
+const BROKER_TTL = 30 * 60 * 1000; // server caches 6 h; client refreshes politely
+const BROKER_RADAR_TTL = 5 * 60 * 1000;
 
 /** Real-data provider backed by the app's Vercel API. */
 export class ApiMarketDataProvider implements MarketDataProvider {
@@ -112,6 +125,27 @@ export class ApiMarketDataProvider implements MarketDataProvider {
   async getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string }> {
     return cachedFetch("events", EVENTS_TTL, () =>
       apiGet<{ actions: CorporateAction[]; updatedAt: string }>("/api/events"),
+    );
+  }
+
+  async getBrokerSummary(ticker: string): Promise<BrokerAccumulationSummary | null> {
+    const t = ticker.toUpperCase();
+    return cachedFetch(`broker:${t}`, BROKER_TTL, async () => {
+      try {
+        const body = await apiGet<{ summary: BrokerAccumulationSummary }>(
+          `/api/broker-summary/${encodeURIComponent(t)}`,
+        );
+        return body.summary;
+      } catch {
+        // 404/502 → "Broker data unavailable" state (Section 28), not a fake zero
+        return null;
+      }
+    });
+  }
+
+  async getBrokerRadar(): Promise<{ entries: BrokerRadarEntry[]; updatedAt: string }> {
+    return cachedFetch("broker-radar", BROKER_RADAR_TTL, () =>
+      apiGet<{ entries: BrokerRadarEntry[]; updatedAt: string }>("/api/broker-radar"),
     );
   }
 }

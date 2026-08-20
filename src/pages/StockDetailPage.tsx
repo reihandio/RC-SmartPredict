@@ -16,6 +16,7 @@ import { WhyPanel } from "../features/stock/WhyPanel";
 import { EntryExitPanel } from "../features/stock/EntryExitPanel";
 import { LargeActivityPanel } from "../features/stock/LargeActivityPanel";
 import { RecentActions } from "../features/stock/RecentActions";
+import { BrokerVolumeTabs } from "../features/stock/BrokerVolumeTabs";
 import { cn } from "../lib/utils";
 import { C } from "../lib/colors";
 
@@ -150,6 +151,8 @@ export default function StockDetailPage() {
 
               <IntelligenceSummary stock={data.stock} />
               <MoneyFlowDetail stock={data.stock} />
+              {/* NEW (13a/13b): Bandarmology + Volume Quality tabs — additive */}
+              <BrokerVolumeTabs ticker={t} />
             </div>
 
             <div className="space-y-5">

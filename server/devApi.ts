@@ -40,6 +40,19 @@ const ROUTES: Array<{
     match: /^\/api\/events$/,
     call: (h) => h.handleEvents(),
   },
+  {
+    match: /^\/api\/broker-summary\/([^/]+)$/,
+    call: (h, m) => h.handleBrokerSummary(decodeURIComponent(m[1] ?? "")),
+  },
+  {
+    match: /^\/api\/broker-radar$/,
+    call: (h) => h.handleBrokerRadar(),
+  },
+  {
+    // local dev convenience: same handler as the Vercel cron route, no secret
+    match: /^\/api\/cron\/broker-radar$/,
+    call: (h) => h.handleCronBrokerRadar(),
+  },
 ];
 
 export function devApi(): Plugin {
