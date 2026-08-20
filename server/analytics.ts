@@ -585,6 +585,7 @@ export function corporateActionsFromEvents(
         impact: isDividend ? ("POSITIVE" as const) : ("NEUTRAL" as const),
         amount: isDividend ? e.amount : undefined,
         score: isDividend ? Math.round(clamp(60 + yieldPct * 5, 50, 90)) : 55,
+        source: "Yahoo Finance",
       };
     });
 }

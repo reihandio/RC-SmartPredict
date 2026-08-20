@@ -77,8 +77,8 @@ export async function handleHistory(ticker: string, range: string): Promise<Hand
 
 export async function handleEvents(): Promise<HandlerResult> {
   try {
-    const { actions, updatedAt } = await getEvents();
-    return { status: 200, body: { actions, updatedAt } };
+    const { actions, updatedAt, warnings } = await getEvents();
+    return { status: 200, body: { actions, updatedAt, warnings } };
   } catch (err) {
     return SERVER_ERROR(err);
   }

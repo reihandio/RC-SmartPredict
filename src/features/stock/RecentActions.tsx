@@ -1,16 +1,12 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Banknote, Scissors } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { CorporateAction } from "../../types";
 import { formatDate } from "../../lib/utils";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
+import { actionTypeMeta, impactBadge } from "../corporate-actions/actionMeta";
 
-const TYPE_ICON = {
-  Dividend: Banknote,
-  "Stock Split": Scissors,
-} as const;
-
-/** Real corporate events for this ticker (dividends / splits). */
+/** Real corporate events for this ticker (Yahoo events + news feed). */
 export function RecentActions({ actions }: { actions: CorporateAction[] }) {
   return (
     <Card className="card-pad fade-up" style={{ animationDelay: "220ms" }}>
@@ -31,7 +27,8 @@ export function RecentActions({ actions }: { actions: CorporateAction[] }) {
       ) : (
         <ul className="space-y-2">
           {actions.slice(0, 3).map((a) => {
-            const Icon = TYPE_ICON[a.type];
+            const Icon = actionTypeMeta(a.type).icon;
+            const impact = impactBadge(a.impact);
             return (
               <li key={a.id} className="rounded-lg border border-white/5 bg-surface2/50 p-3">
                 <div className="flex items-center gap-2.5">
@@ -41,16 +38,27 @@ export function RecentActions({ actions }: { actions: CorporateAction[] }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-ink">{a.type}</span>
-                      <Badge variant={a.impact === "POSITIVE" ? "good" : "neutral"}>
-                        {a.impact === "POSITIVE" ? "Positive" : "Neutral"}
-                      </Badge>
+                      <Badge variant={impact.variant}>{impact.label}</Badge>
                     </div>
                     <div className="mt-0.5 text-[11px] text-muted">
-                      {formatDate(a.date)} · Catalyst {a.score}
+                      {formatDate(a.date)} · Catalyst {a.score} · {a.source}
                     </div>
                   </div>
                 </div>
-                <p className="mt-2 text-xs leading-relaxed text-ink2">{a.description}</p>
+                <p className="mt-2 text-xs leading-relaxed text-ink2">
+                  {a.sourceUrl ? (
+                    <a
+                      href={a.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="transition hover:text-accent"
+                    >
+                      {a.description}
+                    </a>
+                  ) : (
+                    a.description
+                  )}
+                </p>
               </li>
             );
           })}

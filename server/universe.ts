@@ -16,50 +16,10 @@ import {
 } from "./analytics.js";
 import { volumeAuthenticity } from "./volumeAuthenticity.js";
 import { getCachedBrokerSummary } from "./broker/service.js";
+import { cached } from "./cache.js";
+import { getCorporateActionsFeed } from "./corporateActions/service.js";
 
-// ── tiny in-memory TTL cache (per warm instance) ───────────────────────
-
-interface CacheEntry<T> {
-  data: T;
-  at: number; // ms timestamp of the fetch that produced `data`
-  expires: number;
-}
-
-const cache = new Map<string, CacheEntry<unknown>>();
-// in-flight background refreshes per key — dedupes a burst of stale reads so
-// N requests on a stale key trigger ONE refresh, not N (stampede guard).
-const inflight = new Map<string, Promise<void>>();
-
-/**
- * Stale-while-revalidate cache: fresh entries are served as-is; stale ones
- * are served immediately (the user never waits or errors on a slow upstream)
- * while ONE background refresh updates the cache for the next request. The
- * refresh runs in-process — on Vercel a warm instance may be frozen right
- * after responding, so the refresh is best-effort here (unlike the broker
- * cache, whose refresh is kept alive via waitUntil); a cold instance simply
- * recomputes. TTLs are short because Yahoo quotes are cheap and stable.
- */
-async function cached<T>(key: string, ttlMs: number, compute: () => Promise<T>): Promise<T> {
-  const now = Date.now();
-  const hit = cache.get(key);
-  if (hit && hit.expires > now) return hit.data as T;
-  if (hit && hit.expires <= now) {
-    if (!inflight.has(key)) {
-      const p = compute()
-        .then((data) => {
-          const done = Date.now();
-          cache.set(key, { data, at: done, expires: done + ttlMs });
-        })
-        .catch(() => undefined) // keep serving stale; retry on a later request
-        .finally(() => inflight.delete(key));
-      inflight.set(key, p);
-    }
-    return hit.data as T;
-  }
-  const data = await compute();
-  cache.set(key, { data, at: now, expires: now + ttlMs });
-  return data;
-}
+// ── tiny in-memory TTL cache (per warm instance) — see server/cache.ts ──
 
 /** Run an async map with a concurrency limit (gentle with the provider). */
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -199,7 +159,7 @@ async function computeStockDetail(ticker: string) {
     ticker: symbol.replace(/\.JK$/i, ""),
   };
 
-  const actions = corporateActionsFromEvents(chart.events, quote);
+  const actions = await mergeWithNewsFeed(corporateActionsFromEvents(chart.events, quote), symbol);
   return { stock: detail, actions, updatedAt: quote.updatedAt };
 }
 
@@ -213,7 +173,26 @@ export function getStockDetail(ticker: string): Promise<{
 
 // ── corporate action radar ──────────────────────────────────────────────
 
-async function computeEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string }> {
+/** Merge Yahoo's structured dividends/splits with the classified news feed.
+ *  Yahoo entries win on duplicates (they carry precise amounts/yields). */
+async function mergeWithNewsFeed(
+  yahooActions: CorporateAction[],
+  symbol: string,
+): Promise<CorporateAction[]> {
+  const feed = await getCorporateActionsFeed().catch(() => null);
+  const live = (feed?.actions ?? []).filter((a) => a.ticker === symbol.replace(/\.JK$/i, ""));
+  const seen = new Set(yahooActions.map((a) => `${a.ticker}|${a.date}|${a.type}`));
+  return [
+    ...yahooActions,
+    ...live.filter((a) => !seen.has(`${a.ticker}|${a.date}|${a.type}`)),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+async function computeEvents(): Promise<{
+  actions: CorporateAction[];
+  updatedAt: string;
+  warnings: string[];
+}> {
   const quotes = await getQuotes(WATCHLIST);
 
   const collected = await mapLimit(quotes, 6, async (q) => {
@@ -221,19 +200,31 @@ async function computeEvents(): Promise<{ actions: CorporateAction[]; updatedAt:
     return corporateActionsFromEvents(chart.events, q);
   });
 
-  const actions = collected
-    .flat()
+  const yahooActions = collected.flat();
+  const feed = await getCorporateActionsFeed().catch(() => null);
+  const seen = new Set(yahooActions.map((a) => `${a.ticker}|${a.date}|${a.type}`));
+  const actions = [
+    ...yahooActions,
+    ...(feed?.actions ?? []).filter((a) => !seen.has(`${a.ticker}|${a.date}|${a.type}`)),
+  ]
     .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 60);
+    .slice(0, 80);
 
   const updatedAt = quotes.reduce(
     (max, q) => (q.updatedAt > max ? q.updatedAt : max),
     quotes[0]?.updatedAt ?? new Date().toISOString(),
   );
-  return { actions, updatedAt };
+  const warnings = feed
+    ? feed.warnings
+    : ["Corporate action news feed unavailable — showing dividends and splits only."];
+  return { actions, updatedAt, warnings };
 }
 
-export function getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string }> {
+export function getEvents(): Promise<{
+  actions: CorporateAction[];
+  updatedAt: string;
+  warnings: string[];
+}> {
   return cached("events", EVENTS_TTL, computeEvents);
 }
 

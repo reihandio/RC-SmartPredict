@@ -1,16 +1,12 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Banknote, Scissors } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { CorporateAction } from "../../types";
 import { formatDate } from "../../lib/utils";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
+import { actionTypeMeta, impactBadge } from "../corporate-actions/actionMeta";
 
-const TYPE_ICON = {
-  Dividend: Banknote,
-  "Stock Split": Scissors,
-} as const;
-
-/** Latest real corporate events (dividends / splits from the data provider). */
+/** Latest real corporate events (Yahoo events + classified news feed). */
 export function CatalystPreview({ actions }: { actions: CorporateAction[] }) {
   const latest = actions.slice(0, 5);
 
@@ -19,7 +15,7 @@ export function CatalystPreview({ actions }: { actions: CorporateAction[] }) {
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-ink">Latest Corporate Actions</h2>
-          <p className="text-xs text-muted">Dividends & splits from the data provider</p>
+          <p className="text-xs text-muted">Live events from market data & news feeds</p>
         </div>
         <Link
           to="/corporate-actions"
@@ -37,7 +33,8 @@ export function CatalystPreview({ actions }: { actions: CorporateAction[] }) {
       ) : (
         <ul className="space-y-2.5">
           {latest.map((a) => {
-            const Icon = TYPE_ICON[a.type];
+            const Icon = actionTypeMeta(a.type).icon;
+            const impact = impactBadge(a.impact);
             return (
               <li key={a.id}>
                 <Link
@@ -57,9 +54,7 @@ export function CatalystPreview({ actions }: { actions: CorporateAction[] }) {
                     </span>
                     <span className="mt-0.5 block truncate text-xs text-ink2">{a.description}</span>
                     <span className="mt-1.5 flex items-center gap-2">
-                      <Badge variant={a.impact === "POSITIVE" ? "good" : "neutral"}>
-                        {a.impact === "POSITIVE" ? "Positive" : "Neutral"}
-                      </Badge>
+                      <Badge variant={impact.variant}>{impact.label}</Badge>
                       <span className="num text-[11px] text-muted">Catalyst {a.score}</span>
                     </span>
                   </span>

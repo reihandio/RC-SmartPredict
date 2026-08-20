@@ -726,21 +726,31 @@ interface SwingCandidate {
 
 # 14. Corporate Actions
 
-Create a Corporate Action Radar.
+Create a Corporate Action Radar. This must NOT be dividend/RUPS-only — cover the full range of corporate actions that actually move IDX stocks:
 
-Show events such as:
+```text
+Dividend
+RUPS / RUPSLB (shareholder meeting)
+Buyback
+Acquisition (Akuisisi)
+Merger
+Rights Issue (Right Issue)
+Tender Offer
+Stock Split / Reverse Split
+Private Placement
+Expansion (Ekspansi)
+New Contract
+Strategic Partnership
+Ownership Change
+```
 
-* Dividend
-* Buyback
-* Acquisition
-* Merger
-* Rights issue
-* Stock split
-* New contract
-* Strategic partnership
-* Ownership change
+This list can grow — keep `type` as an open string/union that's easy to extend, not a hardcoded 5-value enum.
 
-Each event should have:
+### Filterable feed, similar to how Indonesian stock-news apps present this (category chips + source chips):
+
+* **Type filter chips**: Semua, Saham, Akuisisi, Ekspansi, Private Placement, Right Issue, Tender, Merger, Dividend, Buyback, etc. — multi-select or single-select tabs above the list.
+* **Source filter chips** (optional second row): show which outlet each item came from (e.g. IDX Channel, EmitenNews, CNBC Indonesia, or whichever live sources end up being used per Section 3) so users can trust/filter by source.
+* Keep the existing per-ticker event card format:
 
 ```text
 Ticker
@@ -766,9 +776,13 @@ Catalyst Score
 82
 ```
 
-Use demo data initially.
+### Live sourcing
 
-Clearly label demo/simulated data where applicable.
+Corporate action data must come from live public sources, not mock data (Section 3/19 apply here too). Realistic free/public options to research and pick from: IDX's own public keterbukaan informasi (disclosure) announcements, and/or public news feeds/RSS from Indonesian financial media (e.g. IDX Channel, EmitenNews, CNBC Indonesia, or similar) — pick based on the Section 3 criteria (free, public, reasonably stable). Classify each incoming item into one of the types above and assign impact (`POSITIVE`/`NEUTRAL`/`NEGATIVE`) and a catalyst score using simple keyword/category-based rules — this doesn't need ML, just a mapping table that's easy to extend as new sources/types show up.
+
+Do **not** add a new Cron Job for this. Fetch live on-demand with the same short-lived cache/stale-while-revalidate pattern already used elsewhere (Section 25) — this is a lighter, less frequently-changing data type than broker summary and doesn't need its own scheduled job.
+
+Use demo data only for local dev/testing (Section 19), never in production.
 
 ---
 
@@ -985,10 +999,12 @@ Corporate action:
 interface CorporateAction {
   ticker: string;
   date: string;
-  type: string;
+  type: string; // open string, not a fixed enum — see Section 14 for the current taxonomy
   description: string;
   impact: "POSITIVE" | "NEUTRAL" | "NEGATIVE";
   score: number;
+  source: string; // e.g. "IDX Channel", "EmitenNews" — whichever live source it came from
+  sourceUrl?: string;
 }
 ```
 
@@ -1078,6 +1094,7 @@ SignalBadge
 MoneyFlowCard
 RiskBadge
 CorporateActionCard
+CorporateActionFilterChips
 PriceChart
 VolumeChart
 StockScreener
@@ -1149,6 +1166,12 @@ vercel
 or through GitHub → Vercel.
 
 Avoid dependencies that require special server configuration. Broker/volume scoring (Sections 13a-13b) is the heaviest computation **and** typically relies on the most fragile data source (Bandarmology data rarely has an official free API) — always run it in a Vercel Serverless Function or Cron Job that writes precomputed results to a cache (Vercel KV / Edge Config), never client-side or on every request. Apply the same caching discipline to any unofficial/scraped endpoint used for live price data (Section 3), since those are the most rate-limit-prone.
+
+**Vercel Hobby plan constraint:** on the free (Hobby) tier, Vercel Cron Jobs can run **at most once per day** — expressions like hourly or every-30-minutes will fail deployment. Since this project stays on the free tier, design the refresh strategy around that limit:
+
+* Vercel Cron handles one guaranteed daily refresh per data type.
+* For fresher updates within the day without extra cron slots, use an on-demand **stale-while-revalidate** pattern: when a cached entry is read and found older than a defined TTL (e.g. a few hours for broker/volume scores, shorter for price data), serve the stale value immediately and kick off a background refresh (or refresh on that request) that updates the cache for the next reader. This does not require an additional cron job.
+* Keep TTLs realistic for a free-tier scraping/unofficial-API setup — don't set them so short that they effectively recreate a high-frequency cron via request volume.
 
 ---
 
@@ -1308,6 +1331,13 @@ Add Swing Trade Candidate Detection (Section 13c), including `/swing-candidates`
 
 Polish UI.
 
+## Step 11
+
+Build production version.
+
+## Step 12
+
+Deploy to Vercel.
 
 ---
 

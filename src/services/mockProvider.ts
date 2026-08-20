@@ -360,6 +360,7 @@ const FIXTURE_ACTIONS: CorporateAction[] = [
     impact: "POSITIVE",
     amount: 112,
     score: 72,
+    source: "Yahoo Finance",
   },
   {
     id: "fx-bbca-div",
@@ -371,6 +372,7 @@ const FIXTURE_ACTIONS: CorporateAction[] = [
     impact: "POSITIVE",
     amount: 145,
     score: 68,
+    source: "Yahoo Finance",
   },
   {
     id: "fx-adro-split",
@@ -381,6 +383,43 @@ const FIXTURE_ACTIONS: CorporateAction[] = [
     description: "Stock split",
     impact: "NEUTRAL",
     score: 55,
+    source: "Yahoo Finance",
+  },
+  {
+    id: "fx-bbca-buyback",
+    ticker: "BBCA",
+    companyName: "PT Bank Central Asia Tbk",
+    date: "2026-08-15",
+    type: "Buyback",
+    description: "BBCA Mau Buyback Saham, Siapkan Dana Rp 1,5 Triliun",
+    impact: "POSITIVE",
+    score: 78,
+    source: "CNBC Indonesia",
+    sourceUrl: "https://www.cnbcindonesia.com/market",
+  },
+  {
+    id: "fx-tlkm-acq",
+    ticker: "TLKM",
+    companyName: "PT Telkom Indonesia Tbk",
+    date: "2026-08-12",
+    type: "Acquisition",
+    description: "TLKM Akuisisi Perusahaan Cloud, Perkuat Bisnis Digital",
+    impact: "POSITIVE",
+    score: 81,
+    source: "IDX Channel",
+    sourceUrl: "https://www.idxchannel.com/",
+  },
+  {
+    id: "fx-asii-neg",
+    ticker: "ASII",
+    companyName: "PT Astra International Tbk",
+    date: "2026-08-09",
+    type: "Expansion",
+    description: "Laba ASII Anjlok, Rencana Ekspansi Ditunda",
+    impact: "NEGATIVE",
+    score: 38,
+    source: "CNBC Indonesia",
+    sourceUrl: "https://www.cnbcindonesia.com/market",
   },
 ];
 
@@ -470,8 +509,8 @@ export class MockMarketDataProvider implements MarketDataProvider {
     return fixtureBars(ticker.toUpperCase(), range, price);
   }
 
-  async getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string }> {
-    return { actions: FIXTURE_ACTIONS, updatedAt: UPDATED_AT };
+  async getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string; warnings: string[] }> {
+    return { actions: FIXTURE_ACTIONS, updatedAt: UPDATED_AT, warnings: [] };
   }
 
   async getBrokerSummary(ticker: string): Promise<BrokerAccumulationSummary | null> {
