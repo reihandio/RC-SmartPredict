@@ -35,7 +35,7 @@ export interface MarketDataProvider {
     updatedAt: string;
   }>;
   getHistoricalPrices(ticker: string, range: TimeRange): Promise<PriceData[]>;
-  getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string }>;
+  getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string; warnings: string[] }>;
   /** Bandarmology (Section 13a). Null = data unavailable (never a fake zero). */
   getBrokerSummary(ticker: string): Promise<BrokerAccumulationSummary | null>;
   getBrokerRadar(): Promise<{ entries: BrokerRadarEntry[]; updatedAt: string }>;
@@ -126,9 +126,9 @@ export class ApiMarketDataProvider implements MarketDataProvider {
     return body.bars;
   }
 
-  async getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string }> {
+  async getEvents(): Promise<{ actions: CorporateAction[]; updatedAt: string; warnings: string[] }> {
     return cachedFetch("events", EVENTS_TTL, () =>
-      apiGet<{ actions: CorporateAction[]; updatedAt: string }>("/api/events"),
+      apiGet<{ actions: CorporateAction[]; updatedAt: string; warnings: string[] }>("/api/events"),
     );
   }
 

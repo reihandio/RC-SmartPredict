@@ -98,17 +98,38 @@ export interface LargeActivityEvent {
   note: string;
 }
 
-/** Real corporate actions available from the free source (Yahoo events). */
+/** Canonical corporate-action taxonomy (Section 14). Open-ended by design —
+ *  new types can be added without breaking consumers; this list only drives
+ *  filter chips, icons, and the server-side keyword classifier. */
+export const CORPORATE_ACTION_TYPES = [
+  "Dividend",
+  "RUPS",
+  "Buyback",
+  "Acquisition",
+  "Merger",
+  "Right Issue",
+  "Tender Offer",
+  "Stock Split",
+  "Private Placement",
+  "Expansion",
+  "New Contract",
+  "Strategic Partnership",
+  "Ownership Change",
+] as const;
+
+/** Real corporate actions from the live sources (Yahoo events + news feeds). */
 export interface CorporateAction {
   id: string;
   ticker: string;
   companyName: string;
   date: string; // yyyy-mm-dd
-  type: "Dividend" | "Stock Split";
+  type: string; // open string — see CORPORATE_ACTION_TYPES for the current taxonomy
   description: string;
-  impact: "POSITIVE" | "NEUTRAL";
+  impact: "POSITIVE" | "NEUTRAL" | "NEGATIVE";
   amount?: number; // dividend per share
   score: number;
+  source: string; // e.g. "CNBC Indonesia", "IDX Channel", "Yahoo Finance"
+  sourceUrl?: string;
 }
 
 export interface MarketOverview {
